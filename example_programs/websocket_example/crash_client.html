@@ -1,0 +1,50 @@
+<html>
+  <head>
+    <title>Crash client</title>
+    <meta charset="UTF-8" />
+    <script>
+      let ws = null;
+      let count = 0;
+      const wsUrl = 'ws://localhost:9275/websocket';
+
+      const ping = () => ws.send('ping');
+          
+      const connect = () => {
+          console.log(`Connecting to ${wsUrl}`);
+          ws = new WebSocket(wsUrl);
+
+          ws.onopen = () => {
+              console.info(`Connected to ${wsUrl}`);
+              ping();
+          }
+
+          ws.onmessage = (event) => {
+              const img = document.getElementById('img');
+              const h1 = document.getElementById('h1');
+              // console.log('onmessage', event.data);
+              ++count;
+              img.src = URL.createObjectURL(event.data);
+              h1.innerHTML = `${count} messages`;
+              ping();
+          }
+
+          ws.onclose = (event) => {
+              console.log(`Disconnected from ${wsUrl}`);
+              connect();
+          }
+
+          ws.onerror = () => ws.close();
+      }
+
+      const freeImg = () => {
+          const img = document.getElementById('img');
+          URL.revokeObjectURL(img.src);
+      }
+    </script>
+  </head>
+  <body>
+    <h1 id="h1">Crash messages</h1>
+    <img id="img" onload="freeImg();" />
+    <script>connect();</script>
+  </body>
+</html>
