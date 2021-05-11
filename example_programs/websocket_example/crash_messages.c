@@ -9,6 +9,7 @@
 #define PORT 9275
 #define PREFIX_WEBSOCKET "/websocket%d"
 #define WEBSOCKETS 10
+#define INSTANCES 10
 
 #if defined(U_DISABLE_WEBSOCKET)
 
@@ -54,48 +55,52 @@ static long png_len = -1;
  */
 int main(int argc, char ** argv) {
   int ret;
-  struct _u_instance instance;
+  struct _u_instance instance[INSTANCES];
   
   y_init_logs("crash_messages", Y_LOG_MODE_CONSOLE, Y_LOG_LEVEL_DEBUG, NULL, "Starting crash_messages");
 
   png_data = read_file(PNG_FILE, &png_len);
   y_log_message(Y_LOG_LEVEL_INFO, "Read %s: %ld bytes", PNG_FILE, png_len);
-  
-  if (ulfius_init_instance(&instance, PORT, NULL, NULL) != U_OK) {
-    y_log_message(Y_LOG_LEVEL_ERROR, "Error ulfius_init_instance, abort");
-    return(1);
-  }
+
+  for (int8_t i = 0; i < INSTANCES; ++i) {
+    if (ulfius_init_instance(&instance[i], PORT + i, NULL, NULL) != U_OK) {
+      y_log_message(Y_LOG_LEVEL_ERROR, "Error ulfius_init_instance, abort");
+      return(1);
+    }
     
-  u_map_put(instance.default_headers, "Access-Control-Allow-Origin", "*");
+    u_map_put(instance[i].default_headers, "Access-Control-Allow-Origin", "*");
     
-  // Endpoint list declaration
-  for (int8_t i = 0; i < WEBSOCKETS; ++i) {
-    char *name = msprintf(PREFIX_WEBSOCKET, i);
-    y_log_message(Y_LOG_LEVEL_INFO, "Create endpoint '%s'", name);
-    ulfius_add_endpoint_by_val(&instance, "GET", name, NULL, 0, &callback_websocket, NULL);
-    o_free(name);
+    // Endpoint list declaration
+    for (int8_t j = 0; j < WEBSOCKETS; ++j) {
+      char *name = msprintf(PREFIX_WEBSOCKET, j);
+      y_log_message(Y_LOG_LEVEL_INFO, "Create endpoint '%s'", name);
+      ulfius_add_endpoint_by_val(&instance[i], "GET", name, NULL, 0, &callback_websocket, NULL);
+      o_free(name);
+    }
+
+    // Start the framework
+    ret = ulfius_start_framework(&instance[i]);
+    
+    if (ret == U_OK) {
+      y_log_message(Y_LOG_LEVEL_INFO, "Start framework on port %d", instance[i].port);
+    } else {
+      y_log_message(Y_LOG_LEVEL_ERROR, "Error starting framework");
+    }
   }
 
-  // Start the framework
-  ret = ulfius_start_framework(&instance);
-    
-  if (ret == U_OK) {
-    y_log_message(Y_LOG_LEVEL_INFO, "Start framework on port %d", instance.port);
-      
-    // Wait for the user to press <enter> on the console to quit the application
-    getchar();
-  } else {
-    y_log_message(Y_LOG_LEVEL_ERROR, "Error starting framework");
-  }
+  // Wait for the user to press <enter> on the console to quit the application
+  getchar();
   y_log_message(Y_LOG_LEVEL_INFO, "End framework");
     
-  for (int8_t i = 0; i < WEBSOCKETS; ++i) {
-    char *name = msprintf(PREFIX_WEBSOCKET, i);
-    ulfius_remove_endpoint_by_val(&instance, "GET", name, NULL);
-    o_free(name);
+  for (int8_t i = 0; i < INSTANCES; ++i) {
+    for (int8_t j = 0; j < WEBSOCKETS; ++j) {
+      char *name = msprintf(PREFIX_WEBSOCKET, i);
+      ulfius_remove_endpoint_by_val(&instance[i], "GET", name, NULL);
+      o_free(name);
+    }
+    ulfius_stop_framework(&instance[i]);
+    ulfius_clean_instance(&instance[i]);
   }
-  ulfius_stop_framework(&instance);
-  ulfius_clean_instance(&instance);
 
   y_close_logs();
   

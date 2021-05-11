@@ -6,7 +6,8 @@
       let ws = null;
       let count = 0;
       const id = Math.floor(Math.random() * 10000) % 10;
-      const wsUrl = `ws://localhost:9275/websocket${id}`;
+      const port = Math.floor(Math.random() * 10000) % 10;
+      const wsUrl = `ws://localhost:${9275+port}/websocket${id}`;
 
       const ping = () => ws.send('ping');
           
