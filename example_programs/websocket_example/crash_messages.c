@@ -7,7 +7,8 @@
 #include <ulfius.h>
 
 #define PORT 9275
-#define PREFIX_WEBSOCKET "/websocket"
+#define PREFIX_WEBSOCKET "/websocket%d"
+#define WEBSOCKETS 10
 
 #if defined(U_DISABLE_WEBSOCKET)
 
@@ -68,7 +69,12 @@ int main(int argc, char ** argv) {
   u_map_put(instance.default_headers, "Access-Control-Allow-Origin", "*");
     
   // Endpoint list declaration
-  ulfius_add_endpoint_by_val(&instance, "GET", PREFIX_WEBSOCKET, NULL, 0, &callback_websocket, NULL);
+  for (int8_t i = 0; i < WEBSOCKETS; ++i) {
+    char *name = msprintf(PREFIX_WEBSOCKET, i);
+    y_log_message(Y_LOG_LEVEL_INFO, "Create endpoint '%s'", name);
+    ulfius_add_endpoint_by_val(&instance, "GET", name, NULL, 0, &callback_websocket, NULL);
+    o_free(name);
+  }
 
   // Start the framework
   ret = ulfius_start_framework(&instance);
@@ -83,7 +89,11 @@ int main(int argc, char ** argv) {
   }
   y_log_message(Y_LOG_LEVEL_INFO, "End framework");
     
-  ulfius_remove_endpoint_by_val(&instance, "GET", PREFIX_WEBSOCKET, NULL);
+  for (int8_t i = 0; i < WEBSOCKETS; ++i) {
+    char *name = msprintf(PREFIX_WEBSOCKET, i);
+    ulfius_remove_endpoint_by_val(&instance, "GET", name, NULL);
+    o_free(name);
+  }
   ulfius_stop_framework(&instance);
   ulfius_clean_instance(&instance);
 
